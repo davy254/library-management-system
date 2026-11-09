@@ -23,6 +23,7 @@ model User {
   name      String
   role      Role     @default(PATRON)
   createdAt DateTime @default(now())
+  reviews   Review[]
 }
 
 model Genre {
@@ -40,5 +41,21 @@ model Book {
   createdAt     DateTime @default(now())
 
   genreId Int
-  genre   Genre @relation(fields: [genreId], references: [id])
+  genre   Genre    @relation(fields: [genreId], references: [id])
+  reviews Review[]
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  bookId Int
+  book   Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, userId])
 }

@@ -54,4 +54,24 @@ The trade-off is that reading a book's genre needs a join. Prisma handles this w
 
 ### Seed data
 
-The seed script inserts 4 genres (Science Fiction, Fantasy, Mystery, African Literature) and 4 books in each, 16 in total. It creates each genre first and then creates its books using that genre's `id`. It clears existing books before inserting, so running it again doesn't create duplicates.
+The seed script inserts 4 genres (Science Fiction, Fantasy, Mystery, African Literature) and 4 books in each, 16 in total. It creates each genre first and then creates its books using that genre's `id`. It clears existing books before inserting, so running it again doesn't create duplicates.t
+
+
+## Prisma vs. a Document Database
+
+I haven't used a document database, but one thing that felt different in Prisma is
+that I had to create the genres before I could create any books. The seed script
+saves each genre first, takes its `id`, and then creates that genre's books using
+`genreId`. From what I understand, a document database would let me skip that
+step and put the genre directly inside each book document, because related data
+can sit inside the same document. In Prisma I had to plan the relationship up
+front and keep things in the right order, which slowed me down at first but also
+protected me: the database rejects a book whose `genreId` doesn't match a real
+genre, so I can't end up with a book pointing to a genre that doesn't exist.
+
+### Review (stretch)
+
+`Review` links a user to a book through two foreign keys (`bookId` and `userId`).
+`@@unique([bookId, userId])` limits each user to one review per book, and
+deleting a book or user also deletes their reviews. The 1 to 5 rating range is
+not enforced by the schema, so it needs to be validated in the API.
