@@ -1,132 +1,57 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Library Management System
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A library book catalog built with NestJS, Prisma and PostgreSQL (hosted on Supabase). This stage covers the data layer: the schema, migrations and seed data.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Setup
 
-## Description
+1. Install dependencies:
+   ```bash
+   cd api
+   npm install
+   ```
+2. Copy `api/.env.example` to `api/.env` and put your own PostgreSQL connection string in `DATABASE_URL`. Never commit `.env`.
+3. Generate the Prisma client and apply the migrations:
+   ```bash
+   npx prisma generate
+   npx prisma migrate dev
+   ```
+4. Seed the database with 4 genres and 16 books:
+   ```bash
+   npx tsx prisma/seed.ts
+   ```
+5. Start the API:
+   ```bash
+   npm run start:dev
+   ```
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Schema Decisions
 
-## Project setup
+### Book references Genre instead of embedding it
 
-```bash
-$ npm install
-```
+Each `Book` stores a `genreId` foreign key that points to a row in the `Genre` table, rather than carrying its own copy of the genre details. A genre is shared by many books, so it makes sense to store it once.
 
-## Compile and run the project
+- **One source of truth.** Renaming a genre means updating a single row, not every book in that genre.
+- **No inconsistent copies.** If genre names were typed into each book, the same genre could end up spelled several ways ("Sci-Fi", "Science Fiction", "scifi"). With a reference, every book points to the same row.
+- **The database enforces valid data.** The foreign key stops a book from pointing to a genre that doesn't exist.
+- **Genres are useful on their own.** Listing all genres or counting the books in each one is simple, without scanning every book.
+- **The relationship fits the data.** One genre has many books and each book has one genre, which is a natural one-to-many relation.
 
-```bash
-# development
-$ npm run start
+The trade-off is that reading a book's genre needs a join. Prisma handles this with `include: { genre: true }`. Embedding would only be simpler if genre data were always read together with the book, never shared and rarely changed, and that isn't true here.
 
-# watch mode
-$ npm run start:dev
+### Role is an enum
 
-# production mode
-$ npm run start:prod
-```
+`User.role` uses a `Role` enum with two values, `PATRON` and `LIBRARIAN`. An enum limits the field to a fixed set of valid values, so typos like `"libarian"` can't be saved. New users default to `PATRON`, the lower-privilege role.
 
-## Run tests
+### Unique fields
 
-```bash
-# unit tests
-$ npm run test
+- `User.email` is unique so two accounts can't share an email address.
+- `Genre.name` is unique so the same genre can't be created twice.
+- `Book.isbn` is unique so the same book can't be added twice.
 
-# e2e tests
-$ npm run test:e2e
+### Optional fields
 
-# test coverage
-$ npm run test:cov
-```
+`Book.isbn` and `Book.publishedYear` are optional, because older or informal titles may not have an ISBN or a known publication year. Fields every book needs (`title`, `author`, `genreId`) are required.
 
-## Deployment
+### Seed data
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
-
-```bash
-$ npx @nestjs/observe link
-```
-
-It installs `@nestjs/observe`, wires it into `AppModule` and `main.ts`, and writes the app key and secret into `.env`, which every `nest start` script (`start`, `start:dev`, `start:debug`) then loads. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
-
-Or do it by hand:
-
-```bash
-$ npm install @nestjs/observe
-```
-
-Then follow the [setup guide](https://docs.nestjs.com/observability/sdk) - it takes a single import and an app key.
-
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+The seed script inserts 4 genres (Science Fiction, Fantasy, Mystery, African Literature) and 4 books in each, 16 in total. It creates each genre first and then creates its books using that genre's `id`. It clears existing books before inserting, so running it again doesn't create duplicates.
